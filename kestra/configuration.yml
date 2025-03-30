@@ -1,0 +1,31 @@
+kestra:
+  repository:
+    type: memory
+  queue:
+    type: memory
+  storage:
+    type: local
+    local:
+      base-path: /tmp/kestra-storage
+
+  server:
+    port: 8080
+    access-log:
+      enabled: true
+
+  tasks:
+    tmp-dir: /tmp/kestra-tasks
+
+  plugins:
+    repositories:
+      central:
+        url: https://repo.maven.apache.org/maven2/
+    paths:
+      - /app/kestra/plugins
+
+  url: http://localhost:8080
+
+  # For dev only
+  metrics:
+    logging:
+      enabled: true

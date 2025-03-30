@@ -1,0 +1,148 @@
+version: "3.8"
+
+volumes:
+  postgres-data:
+    driver: local
+  kestra-data:
+    driver: local
+
+services:
+  # PostgreSQL для Kestra
+  postgres:
+    image: postgres:latest
+    container_name: air-quality-postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - air-quality-network
+
+  # Kestra для оркестрации
+  kestra:
+    image: kestra/kestra:latest
+    container_name: air-quality-kestra
+    pull_policy: always
+    user: "root"
+    command: server standalone
+    volumes:
+      - kestra-data:/app/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kestra-wd:/tmp/kestra-wd
+      - ./kestra/flows:/app/flows
+    environment:
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: k3str4
+        kestra:
+          server:
+            basicAuth:
+              enabled: false
+              username: "admin@kestra.io"
+              password: kestra
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              basePath: "/app/storage"
+          queue:
+            type: postgres
+          tasks:
+            tmpDir:
+              path: /tmp/kestra-wd/tmp
+          url: http://localhost:8080/
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_started
+    networks:
+      - air-quality-network
+
+  # Контейнер для разработки dltHub
+  dlt-dev:
+    build:
+      context: .
+      dockerfile: docker/dlt.Dockerfile
+    container_name: air-quality-dlt
+    volumes:
+      - ./dlt_pipeline:/app/dlt_pipeline
+      - ./secrets:/app/secrets:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCS_BUCKET_PATH=${GCS_BUCKET_PATH:-gs://air-quality-data-lake-de-zoomcamp-air-quality}
+    ports:
+      - "8888:8888" # Для Jupyter Notebook, если понадобится для отладки
+    command: >
+      bash -c "cd /app && 
+              python -m http.server 8888 --directory /app/dlt_pipeline &
+              tail -f /dev/null"  # Держим контейнер запущенным
+    networks:
+      - air-quality-network
+
+  # Контейнер для разработки dbt
+  dbt-dev:
+    build:
+      context: .
+      dockerfile: docker/dbt.Dockerfile
+    container_name: air-quality-dbt
+    volumes:
+      - ./dbt_models:/app/dbt_models
+      - ./secrets:/app/secrets:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - BIGQUERY_DATASET=${BIGQUERY_DATASET:-air_quality_dataset}
+      - BIGQUERY_LOCATION=${BIGQUERY_LOCATION:-EU}
+    ports:
+      - "8580:8080" # Для dbt docs
+    command: >
+      bash -c "cd /app/dbt_models && 
+              dbt debug --profiles-dir=. && 
+              dbt deps --profiles-dir=. &&
+              dbt docs generate --profiles-dir=. &&
+              dbt docs serve --profiles-dir=. --port=8080 &
+              tail -f /dev/null"  # Держим контейнер запущенным
+    networks:
+      - air-quality-network
+
+  # Terraform для инфраструктуры
+  terraform-dev:
+    build:
+      context: .
+      dockerfile: docker/terraform.Dockerfile
+    container_name: air-quality-terraform
+    volumes:
+      - ./terraform:/app/terraform
+      - ./scripts:/app/scripts
+      - ./secrets:/app/secrets:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/credentials.json
+      - TF_VAR_project_id=${GCP_PROJECT_ID}
+    command: >
+      bash -c "cd /app && 
+              chmod +x /app/scripts/init-gcloud.sh && 
+              cd /app/terraform && 
+              terraform init && 
+              tail -f /dev/null"  # Держим контейнер запущенным
+    networks:
+      - air-quality-network
+
+networks:
+  air-quality-network:
+    driver: bridge
+

@@ -1,0 +1,35 @@
+# Заполните переменные и переименуйте файл в terraform.tfvars
+
+# Обязательные переменные
+project_id = "de-zoomcamp-air-quality"
+
+# Необязательные переменные (можно оставить значения по умолчанию)
+region                    = "europe-west1"
+zone                      = "europe-west1-b"
+data_lake_bucket_name     = "air-quality-data-lake"
+kestra_storage_bucket_name = "kestra-storage"
+bigquery_dataset_name     = "air_quality_dataset"
+bigquery_location         = "EU"
+vm_machine_type           = "e2-medium"
+vm_name                   = "kestra-orchestrator"
+sa_name                   = "air-quality-sa"
+environment               = "dev"
+kestra_version            = "0.15.0"
+
+# Метки для ресурсов
+labels = {
+  project     = "air-quality-monitoring"
+  created_by  = "terraform"
+  department  = "data-engineering"
+}
+
+# Настройки Kestra
+kestra_basic_auth_username = "admin@kestra.io"
+kestra_basic_auth_password = "kestra"  # Измените на более безопасный пароль
+
+# Настройки PostgreSQL
+postgres_instance_name = "kestradb"
+postgres_tier          = "db-g1-small"
+postgres_database_name = "kestra"
+postgres_user          = "kestra"
+postgres_password      = "kestra-password"  # Измените на более безопасный пароль

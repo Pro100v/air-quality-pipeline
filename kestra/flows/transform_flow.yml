@@ -1,0 +1,126 @@
+id: air_quality_transform
+namespace: air_quality
+
+labels:
+  purpose: "transform"
+  data: "air-quality"
+
+inputs:
+  - name: run_mode
+    type: STRING
+    required: false
+    defaults: "run"
+    description: "dbt command to run: run, test, or build"
+
+tasks:
+  - id: start_notification
+    type: io.kestra.plugin.notifications.slack.SlackMessage
+    description: "Notification of transformation start"
+    url: "{{ env.SLACK_WEBHOOK_URL }}"
+    message: ":gear: Starting Air Quality Transformation Pipeline"
+
+  - id: run_dbt_transform
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Run dbt to transform data"
+    commands:
+      - cd /path/to/dbt_models && dbt {{ inputs.run_mode }} --profiles-dir=.
+    outputFiles:
+      - /path/to/dbt_models/target/manifest.json
+    envs:
+      GCP_PROJECT_ID: "{{ env.GCP_PROJECT_ID }}"
+      BIGQUERY_DATASET: "air_quality_dataset"
+      BIGQUERY_LOCATION: "EU"
+      GOOGLE_APPLICATION_CREDENTIALS: "/app/secrets/credentials.json"
+    dependsOn:
+      - start_notification
+
+  - id: parse_dbt_results
+    type: io.kestra.plugin.scripts.python.ScriptPython
+    description: "Parse dbt results to extract metrics"
+    runner: PROCESS
+    inputFiles:
+      dbt_parser.py: |
+        import json
+        import os
+        import sys
+
+        try:
+            # Путь к manifest.json
+            manifest_path = "/path/to/dbt_models/target/manifest.json"
+            
+            if not os.path.exists(manifest_path):
+                print("KESTRA_OUTPUT::status::WARNING")
+                print("KESTRA_OUTPUT::warning::Manifest file not found")
+                sys.exit(0)
+            
+            # Чтение и парсинг manifest.json
+            with open(manifest_path, 'r') as f:
+                manifest = json.load(f)
+            
+            # Извлечение метрик для отчета
+            models_count = len([node for node in manifest.get('nodes', {}).values() 
+                              if node.get('resource_type') == 'model'])
+            
+            tests_count = len([node for node in manifest.get('nodes', {}).values() 
+                              if node.get('resource_type') == 'test'])
+            
+            sources_count = len(manifest.get('sources', {}))
+            
+            # Вывод результатов для Kestra
+            print(f"KESTRA_OUTPUT::models_count::{models_count}")
+            print(f"KESTRA_OUTPUT::tests_count::{tests_count}")
+            print(f"KESTRA_OUTPUT::sources_count::{sources_count}")
+            print("KESTRA_OUTPUT::status::SUCCESS")
+            
+        except Exception as e:
+            print(f"KESTRA_OUTPUT::error::{str(e)}")
+            print("KESTRA_OUTPUT::status::FAILED")
+            sys.exit(1)
+    dependsOn:
+      - run_dbt_transform
+
+  - id: success_notification
+    type: io.kestra.plugin.notifications.slack.SlackMessage
+    description: "Notification of transformation success"
+    url: "{{ env.SLACK_WEBHOOK_URL }}"
+    message: |
+      :white_check_mark: Air Quality Transformation Pipeline Completed Successfully
+      * Models processed: {{ outputs.parse_dbt_results.models_count }}
+      * Tests run: {{ outputs.parse_dbt_results.tests_count }}
+      * Sources configured: {{ outputs.parse_dbt_results.sources_count }}
+    conditions:
+      - type: io.kestra.core.models.conditions.types.ExecutionStatusCondition
+        in:
+          - SUCCESS
+    dependsOn:
+      - parse_dbt_results
+
+  - id: failure_notification
+    type: io.kestra.plugin.notifications.slack.SlackMessage
+    description: "Notification of transformation failure"
+    url: "{{ env.SLACK_WEBHOOK_URL }}"
+    message: |
+      :x: Air Quality Transformation Pipeline Failed
+      * Error: {{ outputs.parse_dbt_results.error }}
+    conditions:
+      - type: io.kestra.core.models.conditions.types.ExecutionStatusCondition
+        in:
+          - FAILED
+    dependsOn:
+      - parse_dbt_results
+
+triggers:
+  - id: schedule
+    type: io.kestra.core.models.triggers.types.Schedule
+    description: "Run transformation daily at 3 AM UTC"
+    cron: "0 3 * * *"
+
+  - id: after_extract_load
+    type: io.kestra.core.models.triggers.types.Flow
+    description: "Run transformation after extract-load completes"
+    flowId: air_quality_extract_load
+    namespace: air_quality
+    conditions:
+      - type: io.kestra.core.models.conditions.types.ExecutionStatusCondition
+        in:
+          - SUCCESS

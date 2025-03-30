@@ -172,3 +172,48 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.terraform.lock.hcl
+
+# dbt
+dbt_modules/
+dbt_models/target/
+dbt_models/dbt_packages/
+
+# Secrets
+secrets/*
+!secrets/.gitkeep
+credentials.json
+*.pem
+*.key
+*.p12
+*.json
+
+# Environment files
+.env
+.venv
+env/
+venv/
+
+# Docker
+#.docker/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db

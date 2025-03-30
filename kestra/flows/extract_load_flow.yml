@@ -1,0 +1,152 @@
+id: air_quality_extract_load
+namespace: air_quality
+
+labels:
+  purpose: "extract-load"
+  data: "air-quality"
+
+inputs:
+  - name: api_endpoint
+    type: STRING
+    required: false
+    defaults: "https://api.openaq.org/v2"
+  - name: days
+    type: INTEGER
+    required: false
+    defaults: 7
+  - name: parameters
+    type: STRING
+    required: false
+    defaults: "pm25,pm10,o3,no2,so2,co"
+  - name: countries
+    type: STRING
+    required: false
+  - name: destination
+    type: STRING
+    required: false
+    defaults: "bigquery"
+
+tasks:
+  - id: start_notification
+    type: io.kestra.plugin.notifications.slack.SlackMessage
+    description: "Notification of pipeline start"
+    url: "{{ env.SLACK_WEBHOOK_URL }}"
+    message: ":rocket: Starting Air Quality Extract-Load Pipeline"
+
+  - id: run_extract_load
+    type: io.kestra.plugin.scripts.python.ScriptPython
+    description: "Run dlt pipeline to extract data from OpenAQ API and load to destination"
+    runner: PROCESS
+    inputFiles:
+      dlt_script.py: |
+        import os
+        import sys
+        import logging
+        from datetime import datetime
+
+        # Настройка логирования
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        logger = logging.getLogger(__name__)
+
+        # Добавляем путь к dlt_pipeline в PYTHONPATH
+        sys.path.append('/path/to/dlt_pipeline')
+
+        try:
+            # Импортируем модуль
+            import openaq_pipeline
+
+            # Разбираем параметры
+            api_endpoint = "{{ inputs.api_endpoint }}"
+            days = int("{{ inputs.days }}")
+            
+            parameters_str = "{{ inputs.parameters }}"
+            parameters = parameters_str.split(",") if parameters_str else None
+            
+            countries_str = "{{ inputs.countries }}"
+            countries = countries_str.split(",") if countries_str else None
+            
+            destination = "{{ inputs.destination }}"
+            
+            # Настраиваем переменные окружения для GCP
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/app/secrets/credentials.json"
+            
+            # Запускаем пайплайн
+            logger.info(f"Starting dlt pipeline with parameters: api_endpoint={api_endpoint}, days={days}, parameters={parameters}, countries={countries}")
+            
+            # Инициализация источника данных
+            openaq = openaq_pipeline.openaq_source(
+                api_endpoint=api_endpoint,
+                days=days,
+                parameters=parameters,
+                countries=countries,
+            )
+            
+            # Настройка назначения
+            destination = openaq_pipeline.setup_destination(destination)
+            
+            # Запуск пайплайна
+            pipeline = openaq_pipeline.dlt.pipeline(
+                pipeline_name="openaq_pipeline",
+                destination=destination,
+                dataset_name="air_quality_data",
+                full_refresh=False,
+            )
+            
+            # Загрузка данных
+            start_time = datetime.now()
+            info = pipeline.run(openaq)
+            end_time = datetime.now()
+            
+            logger.info(f"Pipeline run completed: {info}")
+            logger.info(f"Loaded {info.load_package.load_counts} measurements")
+            logger.info(f"Pipeline execution time: {end_time - start_time}")
+            
+            # Вывод результатов для Kestra
+            print(f"KESTRA_OUTPUT::total_records::{info.load_package.load_counts.get('measurements', 0)}")
+            print(f"KESTRA_OUTPUT::execution_time_seconds::{(end_time - start_time).total_seconds()}")
+            print(f"KESTRA_OUTPUT::status::SUCCESS")
+            
+        except Exception as e:
+            logger.error(f"Error in pipeline execution: {str(e)}")
+            print(f"KESTRA_OUTPUT::error::{str(e)}")
+            print("KESTRA_OUTPUT::status::FAILED")
+            sys.exit(1)
+    dependsOn:
+      - start_notification
+
+  - id: success_notification
+    type: io.kestra.plugin.notifications.slack.SlackMessage
+    description: "Notification of pipeline success"
+    url: "{{ env.SLACK_WEBHOOK_URL }}"
+    message: |
+      :white_check_mark: Air Quality Extract-Load Pipeline Completed Successfully
+      * Total records: {{ outputs.run_extract_load.total_records }}
+      * Execution time: {{ outputs.run_extract_load.execution_time_seconds }} seconds
+    conditions:
+      - type: io.kestra.core.models.conditions.types.ExecutionStatusCondition
+        in:
+          - SUCCESS
+    dependsOn:
+      - run_extract_load
+
+  - id: failure_notification
+    type: io.kestra.plugin.notifications.slack.SlackMessage
+    description: "Notification of pipeline failure"
+    url: "{{ env.SLACK_WEBHOOK_URL }}"
+    message: |
+      :x: Air Quality Extract-Load Pipeline Failed
+      * Error: {{ outputs.run_extract_load.error }}
+    conditions:
+      - type: io.kestra.core.models.conditions.types.ExecutionStatusCondition
+        in:
+          - FAILED
+    dependsOn:
+      - run_extract_load
+
+triggers:
+  - id: schedule
+    type: io.kestra.core.models.triggers.types.Schedule
+    description: "Run extract and load daily at 2 AM UTC"
+    cron: "0 2 * * *"
+    backfill:
+      start: "2022-01-01T00:00:00Z"

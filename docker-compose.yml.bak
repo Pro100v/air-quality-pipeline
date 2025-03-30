@@ -1,0 +1,93 @@
+version: "3.8"
+
+services:
+  # Контейнер для разработки dltHub
+  dlt-dev:
+    build:
+      context: .
+      dockerfile: docker/dlt.Dockerfile
+    container_name: air-quality-dlt
+    volumes:
+      - ./dlt_pipeline:/app/dlt_pipeline
+      - ./secrets:/app/secrets:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCS_BUCKET_PATH=${GCS_BUCKET_PATH:-gs://air-quality-data-lake-de-zoomcamp-air-quality}
+    ports:
+      - "8888:8888" # Для Jupyter Notebook, если понадобится для отладки
+    command: >
+      bash -c "cd /app && 
+              python -m http.server 8888 --directory /app/dlt_pipeline &
+              tail -f /dev/null"  # Держим контейнер запущенным
+    networks:
+      - air-quality-network
+
+  # Контейнер для разработки dbt
+  dbt-dev:
+    build:
+      context: .
+      dockerfile: docker/dbt.Dockerfile
+    container_name: air-quality-dbt
+    volumes:
+      - ./dbt_models:/app/dbt_models
+      - ./secrets:/app/secrets:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - BIGQUERY_DATASET=${BIGQUERY_DATASET:-air_quality_dataset}
+      - BIGQUERY_LOCATION=${BIGQUERY_LOCATION:-EU}
+    ports:
+      - "8580:8080" # Для dbt docs
+    command: >
+      bash -c "cd /app/dbt_models && 
+              dbt debug --profiles-dir=. && 
+              dbt deps --profiles-dir=. &&
+              dbt docs generate --profiles-dir=. &&
+              dbt docs serve --profiles-dir=. --port=8080 &
+              tail -f /dev/null"  # Держим контейнер запущенным
+    networks:
+      - air-quality-network
+
+  # Kestra для оркестрации
+  kestra:
+    image: kestra/kestra:latest
+    container_name: air-quality-kestra
+    ports:
+      - "8080:8080" # UI
+    environment:
+      - KESTRA_CONFIGURATION=/app/kestra/configuration.yml
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/credentials.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+    volumes:
+      - ./kestra:/app/kestra
+      - ./secrets:/app/secrets:ro
+    networks:
+      - air-quality-network
+
+  # Terraform для инфраструктуры
+  terraform-dev:
+    build:
+      context: .
+      dockerfile: docker/terraform.Dockerfile
+    container_name: air-quality-terraform
+    volumes:
+      - ./terraform:/app/terraform
+      - ./scripts:/app/scripts
+      - ./secrets:/app/secrets:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/credentials.json
+      - TF_VAR_project_id=${GCP_PROJECT_ID}
+    command: >
+      bash -c "cd /app && 
+              chmod +x /app/scripts/init-gcloud.sh && 
+              cd /app/terraform && 
+              terraform init && 
+              tail -f /dev/null"  # Держим контейнер запущенным
+    networks:
+      - air-quality-network
+
+networks:
+  air-quality-network:
+    driver: bridge
+

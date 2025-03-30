@@ -1,0 +1,51 @@
+version: 1
+
+resources:
+  measurements:
+    description: Air quality measurements from OpenAQ API
+    columns:
+      locationId:
+        name: location_id
+        data_type: text
+        description: ID of the location
+      location:
+        data_type: text
+        description: Name of the location
+      parameter:
+        data_type: text
+        description: Parameter measured (PM2.5, PM10, O3, NO2, SO2, CO)
+      value:
+        data_type: double
+        description: Value of the measurement
+      unit:
+        data_type: text
+        description: Unit of measurement
+      city:
+        data_type: text
+        description: City name
+      country:
+        data_type: text
+        description: Country code
+      coordinates:
+        data_type: complex
+        description: Geographical coordinates
+        items:
+          latitude:
+            data_type: double
+            description: Latitude
+          longitude:
+            data_type: double
+            description: Longitude
+      date:
+        data_type: complex
+        description: Date information
+        items:
+          utc:
+            data_type: timestamp
+            description: Date in UTC
+          local:
+            data_type: timestamp
+            description: Date in local timezone
+      ingestion_timestamp:
+        data_type: timestamp
+        description: Timestamp when the data was ingested
