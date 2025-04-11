@@ -26,6 +26,7 @@ output "kestra_ui_url" {
 output "kestra_ui_login" {
   description = "Логин для доступа к Kestra UI"
   value       = var.kestra_basic_auth_username
+  sensitive   = true
 }
 
 output "postgres_instance" {
@@ -46,11 +47,12 @@ output "postgres_database" {
 output "postgres_user" {
   description = "Имя пользователя PostgreSQL"
   value       = google_sql_user.kestra_user.name
+  sensitive   = true
 }
 
 output "service_account_email" {
   description = "Email сервисного аккаунта"
-  value       = google_service_account.sa.email
+  value       = data.google_service_account.sa.email
 }
 
 output "project_id" {

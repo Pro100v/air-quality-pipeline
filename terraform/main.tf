@@ -20,30 +20,40 @@ locals {
   })
 }
 
-# Создание сервисного аккаунта
-resource "google_service_account" "sa" {
-  account_id   = var.sa_name
-  display_name = "Service Account for Air Quality Data Pipeline"
-  description  = "Used for accessing GCS, BigQuery and running the data pipeline"
+# # Создание сервисного аккаунта
+# resource "google_service_account" "sa" {
+#   account_id   = var.sa_name
+#   display_name = "Service Account for Air Quality Data Pipeline"
+#   description  = "Used for accessing GCS, BigQuery and running the data pipeline"
+# }
+
+# Вместо создания сервисноного аккаунта, используем существующий т.к. это вызывает ошибку 
+# при создании нового сервисного аккаунта, т.к. он уже существует - из за этого 
+# не создаются другие ресурсы - зависит от сервисного аккаунта
+# так же при замене, нужно везде заменить зависимости от него:
+# google_service_account.sa.email >> data.google_service_account.sa.email
+# Использование существующего сервисного аккаунта
+data "google_service_account" "sa" {
+  account_id = var.sa_name
 }
 
 # Назначение ролей для сервисного аккаунта
 resource "google_project_iam_member" "storage_admin" {
   project = var.project_id
   role    = "roles/storage.admin"
-  member  = "serviceAccount:${google_service_account.sa.email}"
+  member  = "serviceAccount:${data.google_service_account.sa.email}"
 }
 
 resource "google_project_iam_member" "bigquery_admin" {
   project = var.project_id
   role    = "roles/bigquery.admin"
-  member  = "serviceAccount:${google_service_account.sa.email}"
+  member  = "serviceAccount:${data.google_service_account.sa.email}"
 }
 
 resource "google_project_iam_member" "cloudsql_admin" {
   project = var.project_id
   role    = "roles/cloudsql.admin"
-  member  = "serviceAccount:${google_service_account.sa.email}"
+  member  = "serviceAccount:${data.google_service_account.sa.email}"
 }
 
 # Создание GCS bucket для Data Lake
@@ -231,9 +241,16 @@ resource "google_compute_instance" "kestra_vm" {
   }
 
   service_account {
-    email  = google_service_account.sa.email
+    email  = data.google_service_account.sa.email
     scopes = ["cloud-platform"]
   }
+
+  depends_on = [
+    google_sql_database_instance.postgres,
+    google_sql_database.kestra_db,
+    google_sql_user.kestra_user,
+    google_storage_bucket.kestra_storage_bucket
+  ]
 
   metadata_startup_script = <<-EOF
     #!/bin/bash
@@ -270,37 +287,16 @@ resource "google_compute_instance" "kestra_vm" {
     curl -o docker-compose.yml \
     https://raw.githubusercontent.com/kestra-io/kestra/develop/docker-compose.yml
     
-    # Формирование файла конфигурации Kestra
-    cat > /opt/kestra/application.yml <<EOL
-kestra:
-  server:
-    basicAuth:
-      enabled: true
-      username: "${var.kestra_basic_auth_username}"
-      password: "${var.kestra_basic_auth_password}"
-  
-  storage:
-    type: gcs
-    gcs:
-      bucket: "${google_storage_bucket.kestra_storage_bucket.name}"
-      projectId: "${var.project_id}"
-      serviceAccount: "\${GOOGLE_SERVICE_ACCOUNT}"
-
-  datasources:
-    postgres:
-      url: jdbc:postgresql://${google_sql_database_instance.postgres.private_ip_address}:5432/${var.postgres_database_name}
-      driverClassName: org.postgresql.Driver
-      username: "${var.postgres_user}"
-      password: "${var.postgres_password}"
-EOL
-    
     # Скачивание ключа сервисного аккаунта
     mkdir -p /opt/kestra/secrets
     gcloud iam service-accounts keys create /opt/kestra/secrets/sa-key.json \
-      --iam-account=${google_service_account.sa.email}
+      --iam-account=${data.google_service_account.sa.email}
     
-    # Обновление docker-compose.yml для Kestra
-    cat > /opt/kestra/docker-compose.yml <<EOL
+    # Сохраняем содержимое ключа в переменную для включения в конфигурацию
+    JSON_CONTENT=$(cat /opt/kestra/sa-key.json | jq -c .)
+    
+    # Создание docker-compose.yml для Kestra
+    cat > /opt/kestra/docker-compose.yml <<DOCKEREOF
 version: "3.8"
 
 services:
@@ -311,16 +307,43 @@ services:
     user: "root"
     command: server standalone
     volumes:
-      - /opt/kestra/application.yml:/app/application.yml
-      - /opt/kestra/secrets:/app/secrets
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kestra-wd:/tmp/kestra-wd
     ports:
-      - "${var.kestra_port}:8080"
+      - "8080:8080"
       - "8081:8081"
     environment:
-      KESTRA_CONFIGURATION: /app/application.yml
       GOOGLE_SERVICE_ACCOUNT: \$\$(cat /app/secrets/sa-key.json)
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://${google_sql_database_instance.postgres.private_ip_address}:5432/${var.postgres_database_name}
+            driverClassName: org.postgresql.Driver
+            username: ${var.postgres_user}
+            password: ${var.postgres_password}
+        kestra:
+          repository:
+            type: postgres
+          queue:
+            type: postgres
+          storage:
+            type: gcs
+            gcs:
+              bucket: ${google_storage_bucket.kestra_storage_bucket.name}
+              projectId: ${var.project_id}
+              serviceAccount: $JSON_CONTENT  
+          server:
+            basicAuth:
+              enabled: true
+              username: "${var.kestra_basic_auth_username}"
+              password: ${var.kestra_basic_auth_password}
+          tasks:
+            tmpDir:
+              path: /tmp/kestra-wd/tmp
+          url: http://localhost:8080/
     restart: unless-stopped
-EOL
+DOCKEREOF
+
     
     # Запуск Kestra с Docker Compose
     cd /opt/kestra
@@ -344,6 +367,21 @@ resource "google_compute_firewall" "kestra_firewall" {
 
   source_ranges = ["0.0.0.0/0"] # В реальном проекте лучше ограничить IP-адресами
   target_tags   = ["kestra"]
+}
+
+# создание firewall правила для доступа к Kestra VM через IAP ssh
+resource "google_compute_firewall" "allow_ssh_iap" {
+  name      = "allow-ssh-iap"
+  network   = google_compute_network.vpc.name
+  direction = "INGRESS"
+  priority  = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["35.235.240.0/20"] # Диапазон IP для IAP
 }
 
 # Создание BigQuery таблиц (пустых) для сырых данных
@@ -428,5 +466,6 @@ resource "google_bigquery_table" "air_quality_raw" {
 ]
 EOF
 
-  labels = local.all_labels
+  labels              = local.all_labels
+  deletion_protection = false # Установите true для production
 }

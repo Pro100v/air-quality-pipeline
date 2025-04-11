@@ -1,28 +1,41 @@
-# Используем хэшикорп Terraform образ
-FROM hashicorp/terraform:1.11
+FROM ubuntu:22.04
 
-# Установка зависимостей
-RUN apk add --no-cache \
-  bash \
+# Установка пакетов
+RUN apt-get update && apt-get install -y \
   curl \
+  unzip \
   jq \
   python3 \
-  py3-pip
+  python3-pip \
+  git \
+  wget \
+  apt-transport-https \
+  ca-certificates \
+  gnupg \
+  lsb-release
+
+# Установка Terraform
+# https://developer.hashicorp.com/terraform/install?product_intent=terraform
+RUN wget -O - https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list && \
+  apt-get update && apt-get install terraform
+
 
 # Установка Google Cloud SDK
-RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
-  tar -xf google-cloud-cli-linux-x86_64.tar.gz && \
-  ./google-cloud-sdk/install.sh --quiet && \
-  rm google-cloud-cli-linux-x86_64.tar.gz
+# https://cloud.google.com/sdk/docs/install#deb
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+  curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && \
+  apt-get update -y && apt-get install google-cloud-cli -y
 
-RUN chmod "+x" ./google-cloud-sdk/path.bash.inc && \
-  ./google-cloud-sdk/path.bash.inc
+
+# RUN curl -sSL https://sdk.cloud.google.com | bash
+# ENV PATH $PATH:/root/google-cloud-sdk/bin
 
 # Настройка рабочей директории
 WORKDIR /app
-#
-# Создание директорий для Terraform кода и секретов
+
+# Создание директорий
 RUN mkdir -p /app/terraform /app/scripts /app/secrets
 
-# Команда по умолчанию (запускаем оболочку)
-ENTRYPOINT ["/bin/bash"]
+# Команда по умолчанию
+CMD ["/bin/bash"]
