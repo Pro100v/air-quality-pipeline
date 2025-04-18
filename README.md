@@ -253,8 +253,8 @@ Kestra orchestrates the entire pipeline with the following workflows:
 
 The transformed data can be visualized using Looker Studio or any other BI tool. Connect to the `air_quality_mart` table in BigQuery for the most comprehensive view of the data.k
 
-![Diagram-1](artifacts/diagram-1.png)
-![Diagram-2](artifacts/diagram-2.png)
+![Diagram-1](artifacts/dig-1.png)
+![Diagram-2](artifacts/dig-2.png)
 
 ## Maintenance and Monitoring
 
