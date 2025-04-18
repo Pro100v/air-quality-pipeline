@@ -1,0 +1,44 @@
+version: 2
+
+sources:
+  - name: raw
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: "{{ env_var('BIGQUERY_DATASET', 'air_quality_dataset') }}"
+    tables:
+      - name: air_quality_raw
+        description: Raw air quality data from IQAir API
+        columns:
+          - name: city
+            description: City name
+          - name: state
+            description: State or region name
+          - name: country
+            description: Country name
+          - name: current__pollution__ts
+            description: Timestamp of pollution data
+          - name: current__pollution__aqius
+            description: Air Quality Index (US standard)
+          - name: current__pollution__mainus
+            description: Main pollutant (US standard)
+          - name: current__pollution__aqicn
+            description: Air Quality Index (China standard)
+          - name: current__pollution__maincn
+            description: Main pollutant (China standard)
+          - name: current__weather__ts
+            description: Timestamp of weather data
+          - name: current__weather__tp
+            description: Temperature in Celsius
+          - name: current__weather__pr
+            description: Pressure in hPa
+          - name: current__weather__hu
+            description: Humidity percentage
+          - name: current__weather__ws
+            description: Wind speed in m/s
+          - name: current__weather__wd
+            description: Wind direction in degrees
+          - name: current__weather__ic
+            description: Weather icon code
+          - name: geo_longitude
+            description: Longitude coordinate
+          - name: geo_latitude
+            description: Latitude coordinate

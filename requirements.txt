@@ -1,6 +1,7 @@
 # Основные зависимости
-dlt>=0.3.5
-dbt-core>=1.4.0
+dlt[bigquery]>=1.9.0
+dbt-core>=1.5.0
+dbt-duckdb>=1.5.0
 dbt-bigquery>=1.4.0
 google-cloud-storage>=2.7.0
 google-cloud-bigquery>=3.6.0
@@ -13,9 +14,9 @@ pyarrow>=10.0.1
 # Инструменты разработки
 pytest>=7.3.1
 pytest-cov>=4.1.0
-black>=23.3.0
-flake8>=6.0.0
-isort>=5.12.0
+# black>=23.3.0
+# flake8>=6.0.0
+# isort>=5.12.0
 
 # Зависимости для Terraform
 python-terraform>=0.10.1

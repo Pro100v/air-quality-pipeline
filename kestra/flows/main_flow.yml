@@ -1,0 +1,26 @@
+id: air_quality_main_flow
+namespace: air_quality
+
+schedule:
+  cron: "0 0 * * *" # Run daily at midnight
+
+tasks:
+  - id: extract_and_load
+    type: io.kestra.core.tasks.flows.Flow
+    namespace: air_quality
+    flowId: air_quality_extract_load
+
+  - id: wait_for_load
+    type: io.kestra.core.tasks.flows.Pause
+    duration: PT5M # Wait for 5 minutes to ensure data is loaded
+    dependsOn:
+      - extract_and_load
+
+  - id: transform_data
+    type: io.kestra.core.tasks.flows.Flow
+    namespace: air_quality
+    flowId: air_quality_transform
+    inputs:
+      date: "{{ now() | date('yyyy-MM-dd') }}"
+    dependsOn:
+      - wait_for_load

@@ -62,3 +62,5 @@ docker-compose.yml
 # Другие
 .DS_Store
 .pytest_cache/
+
+archive/

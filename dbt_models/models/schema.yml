@@ -1,0 +1,190 @@
+version: 2
+
+models:
+  - name: stg_air_quality
+    description: "Cleaned air quality data from the raw source"
+    columns:
+      - name: city
+        description: "City name"
+      - name: state
+        description: "State or region name"
+      - name: country
+        description: "Country name"
+      - name: pollution_timestamp
+        description: "Timestamp when pollution data was recorded"
+      - name: aqi_us
+        description: "Air Quality Index (US standard)"
+      - name: main_pollutant_us
+        description: "Main pollutant (US standard)"
+      - name: aqi_cn
+        description: "Air Quality Index (China standard)"
+      - name: main_pollutant_cn
+        description: "Main pollutant (China standard)"
+      - name: weather_timestamp
+        description: "Timestamp when weather data was recorded"
+      - name: temperature
+        description: "Temperature in Celsius"
+      - name: pressure
+        description: "Pressure in hPa"
+      - name: humidity
+        description: "Humidity percentage"
+      - name: wind_speed
+        description: "Wind speed in m/s"
+      - name: wind_direction
+        description: "Wind direction in degrees"
+      - name: weather_icon
+        description: "Weather icon code"
+      - name: longitude
+        description: "Geographical longitude"
+      - name: latitude
+        description: "Geographical latitude"
+      - name: measurement_date
+        description: "Date of measurement"
+      - name: measurement_time
+        description: "Time of measurement"
+
+  - name: dim_geography
+    description: "Geographic dimension table with hierarchical data"
+    columns:
+      - name: geography_id
+        description: "Surrogate key for the geography dimension"
+        tests:
+          - unique
+          - not_null
+      - name: city
+        description: "City name"
+      - name: state
+        description: "State or region name"
+      - name: country
+        description: "Country name"
+      - name: longitude
+        description: "Geographical longitude"
+      - name: latitude
+        description: "Geographical latitude"
+
+  - name: dim_time
+    description: "Time dimension table"
+    columns:
+      - name: date_id
+        description: "Date in YYYY-MM-DD format, primary key"
+        tests:
+          - unique
+          - not_null
+      - name: full_date
+        description: "Full date as DATE type"
+      - name: year
+        description: "Year number"
+      - name: quarter
+        description: "Quarter number (1-4)"
+      - name: month
+        description: "Month number (1-12)"
+      - name: day_of_month
+        description: "Day of month (1-31)"
+      - name: day_of_week
+        description: "Day of week (1-7, where 1 is Sunday)"
+      - name: day_name
+        description: "Day name (Monday, Tuesday, etc.)"
+      - name: month_name
+        description: "Month name (January, February, etc.)"
+      - name: is_weekend
+        description: "Boolean flag indicating if the date is a weekend"
+
+  - name: fact_air_quality
+    description: "Fact table for air quality measurements"
+    columns:
+      - name: measurement_id
+        description: "Surrogate key for the measurement fact"
+        tests:
+          - unique
+          - not_null
+      - name: geography_id
+        description: "Foreign key to dim_geography"
+        tests:
+          - not_null
+      - name: date_id
+        description: "Foreign key to dim_time"
+        tests:
+          - not_null
+      - name: pollution_timestamp
+        description: "Timestamp when pollution data was recorded"
+      - name: weather_timestamp
+        description: "Timestamp when weather data was recorded"
+      - name: measurement_date
+        description: "Date of measurement"
+      - name: measurement_time
+        description: "Time of measurement"
+      - name: aqi_us
+        description: "Air Quality Index (US standard)"
+      - name: main_pollutant_us
+        description: "Main pollutant (US standard)"
+      - name: aqi_cn
+        description: "Air Quality Index (China standard)"
+      - name: main_pollutant_cn
+        description: "Main pollutant (China standard)"
+      - name: temperature
+        description: "Temperature in Celsius"
+      - name: pressure
+        description: "Pressure in hPa"
+      - name: humidity
+        description: "Humidity percentage"
+      - name: wind_speed
+        description: "Wind speed in m/s"
+      - name: wind_direction
+        description: "Wind direction in degrees"
+      - name: weather_icon
+        description: "Weather icon code"
+      - name: air_quality_category_us
+        description: "Categorized air quality level (US standard)"
+      - name: air_quality_category_cn
+        description: "Categorized air quality level (China standard)"
+
+  - name: air_quality_mart
+    description: "Final denormalized data mart for air quality analysis"
+    columns:
+      - name: measurement_id
+        description: "Unique identifier for the measurement"
+        tests:
+          - unique
+          - not_null
+      - name: city
+        description: "City name"
+      - name: state
+        description: "State or region name"
+      - name: country
+        description: "Country name"
+      - name: longitude
+        description: "Geographical longitude"
+      - name: latitude
+        description: "Geographical latitude"
+      - name: pollution_timestamp
+        description: "Timestamp when pollution data was recorded"
+      - name: weather_timestamp
+        description: "Timestamp when weather data was recorded"
+      - name: measurement_date
+        description: "Date of measurement"
+      - name: measurement_time
+        description: "Time of measurement"
+      - name: aqi_us
+        description: "Air Quality Index (US standard)"
+      - name: main_pollutant_us
+        description: "Main pollutant (US standard)"
+      - name: aqi_cn
+        description: "Air Quality Index (China standard)"
+      - name: main_pollutant_cn
+        description: "Main pollutant (China standard)"
+      - name: air_quality_category_us
+        description: "Categorized air quality level (US standard)"
+      - name: air_quality_category_cn
+        description: "Categorized air quality level (China standard)"
+      - name: temperature
+        description: "Temperature in Celsius"
+      - name: pressure
+        description: "Pressure in hPa"
+      - name: humidity
+        description: "Humidity percentage"
+      - name: wind_speed
+        description: "Wind speed in m/s"
+      - name: wind_direction
+        description: "Wind direction in degrees"
+      - name: weather_icon
+        description: "Weather icon code"

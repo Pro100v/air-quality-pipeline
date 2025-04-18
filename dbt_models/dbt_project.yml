@@ -2,10 +2,8 @@ name: "air_quality"
 version: "1.0.0"
 config-version: 2
 
-# Это базовый путь к директории проекта dbt
-profile: "default"
+profile: "air_quality"
 
-# Эти настройки применяются ко всем файлам в директории models/
 model-paths: ["models"]
 analysis-paths: ["analyses"]
 test-paths: ["tests"]
@@ -13,29 +11,17 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
-target-path: "target" # директория для скомпилированных SQL файлов
-clean-targets: # директории для удаления при запуске dbt clean
+target-path: "target"
+clean-targets:
   - "target"
   - "dbt_packages"
 
-# Настройки для всего проекта
 models:
   air_quality:
-    # Настройки для всех моделей в папке staging
     staging:
       +materialized: view
       +schema: staging
-
-    # Настройки для всех моделей в папке intermediate
-    intermediate:
-      +materialized: view
-      +schema: intermediate
-
-    # Настройки для всех моделей в папке marts
     marts:
       +materialized: table
       +schema: marts
 
-# Переменные проекта
-vars:
-  "dbt_date:time_zone": "UTC"

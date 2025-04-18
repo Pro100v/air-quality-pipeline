@@ -1,5 +1,3 @@
-version: "3.8"
-
 volumes:
   postgres-data:
     driver: local
@@ -145,4 +143,3 @@ services:
 networks:
   air-quality-network:
     driver: bridge
-
