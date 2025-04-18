@@ -1,0 +1,29 @@
+
+# put your configuration values here
+
+[runtime]
+log_level="INFO"  # the system log level of dlt
+# use the dlthub_telemetry setting to enable/disable anonymous usage data reporting, see https://dlthub.com/docs/reference/telemetry
+dlthub_telemetry = true
+request_max_attempts = 10  # Stop after 10 retry attempts instead of 5
+request_backoff_factor = 1.5  # Multiplier applied to the exponential delays. Default is 1
+request_timeout = 120  # Timeout in seconds
+request_max_retry_delay = 30  # Cap exponential delay to 30 seconds
+
+# [pipeline]
+# export_schema_path="schemas/export"
+# import_schema_path="schemas/import"
+
+# [sources.rest_api]
+# resources = ["a", "b", "c"] # please set me up!
+# [sources.rest_api.client] # please set me up!
+# key = "value"
+#
+# [destination.filesystem]
+# layout = "{table_name}/{YYYY}-{MM}-{DD}/{ddd}/{mm}/{load_id}.{file_id}.{ext}"
+
+[normalize]
+loader_file_format = "csv"
+
+[normalize.data_writer]
+disable_compression = true
