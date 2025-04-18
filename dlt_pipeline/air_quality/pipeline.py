@@ -214,20 +214,20 @@ def load_iqair() -> None:
         # destination="duckdb",
         destination="filesystem",
         dataset_name="iqair_api_data",
-        export_schema_path="schemas/export",
-        import_schema_path="schemas/import",
+        # export_schema_path="schemas/export",
+        # import_schema_path="schemas/import",
         dev_mode=True,
     )
 
-    iqair_source_instance = iqair_source()
-    remove_columns_list = ["forecasts"]
-    iqair_source_instance.city.add_map(flatten_city_location).add_map(
-        lambda doc: remove_columns(doc, remove_columns=remove_columns_list)
-    )
-
-    print(pipeline.destination.config_params)  # noqa: T201
+    # iqair_source_instance = iqair_source()
+    # remove_columns_list = ["forecasts"]
+    # iqair_source_instance.city.add_map(flatten_city_location).add_map(
+    #     lambda doc: remove_columns(doc, remove_columns=remove_columns_list)
+    # )
+    #
+    # print(pipeline.destination.config_params)  # noqa: T201
     # return
-    load_info = pipeline.run(iqair_source().add_limit(5))
+    load_info = pipeline.run(iqair_source())
     # load_info = pipeline.run(iqair_source())
     print(load_info)  # noqa: t201
 
