@@ -102,6 +102,8 @@ scp -r ./kestra/flows user@kestra-vm-ip:/path/to/kestra/flows
 ssh user@kestra-vm-ip 'bash -s' < ./scripts/setup-env.sh
 ```
 
+Deployment schema:
+
 ```mermaid
 graph TD
     %% Core Resources
@@ -210,7 +212,6 @@ graph TD
         IAM_BQ
         IAM_SQL
     end
-```
 ```
 
 ## Pipeline Components
